@@ -23,17 +23,24 @@ export class R2MultipartPdfSink implements PdfSink {
   }
 
   async write(chunk: Uint8Array): Promise<void> {
-    this.chunks.push(chunk);
-    this.bufferedBytes += chunk.byteLength;
     this.totalBytes += chunk.byteLength;
-    while (this.bufferedBytes >= this.partSize) {
-      await this.flushPart(false);
+    let offset = 0;
+    while (offset < chunk.byteLength) {
+      const available = this.partSize - this.bufferedBytes;
+      const nextOffset = Math.min(chunk.byteLength, offset + available);
+      const piece = chunk.subarray(offset, nextOffset);
+      this.chunks.push(piece);
+      this.bufferedBytes += piece.byteLength;
+      offset = nextOffset;
+      if (this.bufferedBytes === this.partSize) {
+        await this.flushPart();
+      }
     }
   }
 
   async complete(): Promise<{ object: R2Object; size: number }> {
     if (this.bufferedBytes > 0 || this.uploadedParts.length === 0) {
-      await this.flushPart(true);
+      await this.flushPart();
     }
     const object = await this.upload.complete(this.uploadedParts);
     return { object, size: this.totalBytes };
@@ -43,10 +50,7 @@ export class R2MultipartPdfSink implements PdfSink {
     await this.upload.abort();
   }
 
-  private async flushPart(force: boolean): Promise<void> {
-    if (!force && this.bufferedBytes < this.partSize) {
-      return;
-    }
+  private async flushPart(): Promise<void> {
     const data = concatBytes(this.chunks.splice(0));
     this.bufferedBytes = 0;
     if (data.byteLength === 0) {
