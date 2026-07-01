@@ -1,11 +1,14 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128" role="img" aria-labelledby="title">
   <title id="title">织册</title>
-  <rect width="128" height="128" fill="#fffdf5"/>
-  <rect x="21" y="21" width="88" height="88" fill="#000"/>
-  <rect x="13" y="13" width="88" height="88" fill="#fff" stroke="#000" stroke-width="7"/>
-  <path d="M29 29h56v72H29z" fill="#fffdf5" stroke="#000" stroke-width="7" stroke-linejoin="round"/>
-  <path d="M40 38v54M57 38v54M74 38v54" stroke="#000" stroke-width="8" stroke-linecap="square"/>
-  <path d="M34 52h56M34 70h56M34 88h56" stroke="#000" stroke-width="7" stroke-linecap="square"/>
-  <path d="M37 52h17v18H37zM62 70h17v18H62z" fill="#ffd93d" stroke="#000" stroke-width="4"/>
-  <path d="M54 52h25v18H54zM37 70h25v18H37z" fill="#ff6b6b" stroke="#000" stroke-width="4"/>
+  <g fill="none" stroke="#000" stroke-linecap="square" stroke-linejoin="round">
+    <path d="M24 91V34c0-15 10-24 24-24h48v81H34c-7 0-10 4-10 10" fill="#fffdf5" stroke-width="7"/>
+    <path d="M24 91c0-8 6-14 15-14h66v32H39c-9 0-15-7-15-18Z" fill="#fffdf5" stroke-width="7"/>
+    <path d="M39 87h55M39 95h55M39 103h55" stroke-width="4"/>
+    <path d="M42 22h48v56H42z" fill="#fffdf5" stroke-width="6"/>
+    <path d="M55 22v56M70 22v56M85 22v56" stroke-width="6"/>
+    <path d="M42 38h61M42 53h55M42 68h55" stroke-width="6"/>
+    <path d="M55 38h15v11H55zM85 52h16v12H85zM70 38h13v40H70z" fill="#ffd93d" stroke-width="4"/>
+    <path d="M42 49h28v12H42zM42 64h28v13H42zM91 39h28v12H91z" fill="#ff6b6b" stroke-width="4"/>
+    <path d="M96 9h14v38H96z" fill="#ffd93d" stroke-width="4"/>
+  </g>
 </svg>

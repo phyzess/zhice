@@ -1,23 +1,26 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="760" height="220" viewBox="0 0 760 220" role="img" aria-labelledby="title desc">
   <title id="title">织册 Zhice</title>
-  <desc id="desc">A woven booklet mark for Zhice, a tool that turns public textbook web pages into PDF booklets.</desc>
-  <rect width="760" height="220" fill="#fffdf5"/>
-  <g transform="translate(18 20)">
-    <rect x="20" y="20" width="158" height="158" fill="#000"/>
-    <rect x="8" y="8" width="158" height="158" fill="#fff" stroke="#000" stroke-width="8"/>
-    <path d="M36 36h104v124H36z" fill="#fffdf5" stroke="#000" stroke-width="8" stroke-linejoin="round"/>
-    <path d="M52 48v98M88 48v98M124 48v98" stroke="#000" stroke-width="12" stroke-linecap="square"/>
-    <path d="M44 72h96M44 108h96M44 144h96" stroke="#000" stroke-width="10" stroke-linecap="square"/>
-    <path d="M50 72h30v36H50zM96 108h30v36H96z" fill="#ffd93d" stroke="#000" stroke-width="6"/>
-    <path d="M80 72h46v36H80zM50 108h46v36H50z" fill="#ff6b6b" stroke="#000" stroke-width="6"/>
-    <path d="M140 34l24 14-24 14z" fill="#ffd93d" stroke="#000" stroke-width="6" stroke-linejoin="round"/>
-    <path d="M24 156h116" stroke="#000" stroke-width="8" stroke-linecap="square"/>
-  </g>
-  <g transform="translate(230 46)">
-    <text x="0" y="76" fill="#000" font-family="Arial Black, Microsoft YaHei, PingFang SC, sans-serif" font-size="76" font-weight="900">织册</text>
-    <text x="2" y="132" fill="none" stroke="#000" stroke-width="2.4" font-family="Arial Black, Space Grotesk, sans-serif" font-size="54" font-weight="900">ZHICE</text>
-    <path d="M4 154h270" stroke="#000" stroke-width="8"/>
-    <path d="M294 139h86v36h-86z" fill="#ffd93d" stroke="#000" stroke-width="6"/>
-    <text x="313" y="164" fill="#000" font-family="Arial Black, Space Grotesk, sans-serif" font-size="18" font-weight="900">PDF</text>
+  <desc id="desc">A transparent logo mark showing woven textbook pages beside the Zhice wordmark.</desc>
+  <g fill="none" stroke="#000" stroke-linecap="square" stroke-linejoin="round">
+    <g transform="translate(48 18)">
+      <path d="M42 148V50c0-26 18-42 42-42h92v140H60c-12 0-18 7-18 18" fill="#fffdf5" stroke-width="8"/>
+      <path d="M42 148c0-14 10-24 26-24h122v52H68c-16 0-26-11-26-28Z" fill="#fffdf5" stroke-width="8"/>
+      <path d="M70 140h102M70 153h102M70 166h102" stroke-width="5"/>
+
+      <path d="M74 30h90v96H74z" fill="#fffdf5" stroke-width="7"/>
+      <path d="M97 30v96M126 30v96M155 30v96" stroke-width="7"/>
+      <path d="M74 57h112M74 83h100M74 109h100" stroke-width="7"/>
+
+      <path d="M99 56h28v16H99zM154 80h27v18h-27zM129 57h22v69h-22z" fill="#ffd93d" stroke-width="5"/>
+      <path d="M74 72h53v18H74zM74 98h55v20H74zM165 58h48v18h-48z" fill="#ff6b6b" stroke-width="5"/>
+      <path d="M176 8h22v62h-22z" fill="#ffd93d" stroke-width="5"/>
+    </g>
+
+    <g transform="translate(294 26)">
+      <text x="0" y="98" fill="#000" stroke="none" font-family="Arial Black, Microsoft YaHei, PingFang SC, sans-serif" font-size="102" font-weight="900">织册</text>
+      <path d="M8 152h34" stroke="#ff6b6b" stroke-width="7"/>
+      <text x="62" y="166" fill="#000" stroke="none" font-family="Arial Black, Space Grotesk, sans-serif" font-size="36" font-weight="900" letter-spacing="14">ZHICE</text>
+      <path d="M344 152h34" stroke="#ffd93d" stroke-width="7"/>
+    </g>
   </g>
 </svg>
