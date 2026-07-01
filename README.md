@@ -16,7 +16,7 @@
 - 默认云端生成 PDF，并把结果静默缓存到 R2。
 - 云端失败或排队过久时，可改用浏览器本机生成。
 - 微信或手机浏览器会提示用户换系统浏览器，避免大文件下载失败。
-- 公开可用，但创建生成任务需要 Turnstile 和匿名限流。
+- 公开可用，创建生成任务使用匿名限流保护。
 - 不做登录、不做服务端用户历史、不做 `/admin` 页面。
 
 ## 技术栈
@@ -28,7 +28,7 @@
 - Tailwind CSS v4 + `@tailwindcss/vite`
 - `unplugin-icons` + Lucide Iconify 包
 - Oxlint + Oxfmt
-- D1、R2、Workflows、Durable Objects、Turnstile
+- D1、R2、Workflows、Durable Objects
 
 ## 本地开发
 
@@ -59,12 +59,10 @@ pnpm dev:web
 
 1. 创建 D1 database，并把 `wrangler.jsonc` 中的 `database_id` 换成真实值。
 2. 创建 R2 bucket，默认名为 `zhice`。
-3. 创建 Turnstile site，设置 `TURNSTILE_SECRET_KEY`。
-4. 设置 `OPS_TOKEN` 和 `RATE_LIMIT_PEPPER`。
-5. 应用 D1 migration。
+3. 设置 `OPS_TOKEN` 和 `RATE_LIMIT_PEPPER`。
+4. 应用 D1 migration。
 
 ```bash
-wrangler secret put TURNSTILE_SECRET_KEY
 wrangler secret put OPS_TOKEN
 wrangler secret put RATE_LIMIT_PEPPER
 wrangler d1 migrations apply ZHICE_DB --remote

@@ -1,5 +1,4 @@
 type SecretEnv = {
-  TURNSTILE_SECRET_KEY?: string;
   OPS_TOKEN?: string;
   RATE_LIMIT_PEPPER?: string;
 };

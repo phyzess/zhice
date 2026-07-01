@@ -15,7 +15,6 @@
   },
   "vars": {
     "ENVIRONMENT": "production",
-    "TURNSTILE_SITE_KEY": "0x4AAAAAADtrPF5DctpTzakh",
   },
   "d1_databases": [
     {

@@ -37,6 +37,10 @@
 - `usage_events`：最小匿名事件。
 - `rate_limits`：短期限流计数。
 
+## 公开入口保护
+
+主流程不使用登录或人机验证组件，避免老师在受限网络中被第三方验证框卡住。`POST /api/jobs` 使用匿名 IP 哈希限流；运维能力只通过带 `OPS_TOKEN` 的 Ops API 暴露。
+
 ## PDF 生成
 
 云端生成采用流式 JPEG-to-PDF writer。页图按顺序读取，JPG 原样嵌入 PDF，输出通过 R2 multipart upload 写入，避免整本 PDF 常驻内存。

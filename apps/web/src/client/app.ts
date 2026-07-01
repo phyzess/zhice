@@ -53,15 +53,6 @@ type CurrentLocalPdf = {
   filename: string;
 };
 
-declare global {
-  interface Window {
-    turnstile?: {
-      getResponse: () => string;
-      reset: () => void;
-    };
-  }
-}
-
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
@@ -204,7 +195,6 @@ async function submitJob(url: string, mode: "auto" | "cloud" | "browser"): Promi
       body: JSON.stringify({
         url,
         mode,
-        turnstileToken: window.turnstile?.getResponse() || undefined,
       }),
     });
     const body: unknown = await response.json();
@@ -224,7 +214,6 @@ async function submitJob(url: string, mode: "auto" | "cloud" | "browser"): Promi
     watchJob(body.jobId);
   } catch (error) {
     showFormMessage(error instanceof Error ? error.message : "提交失败，请稍后再试。");
-    window.turnstile?.reset();
   } finally {
     setSubmitting(false);
   }

@@ -1,31 +1,5 @@
 import type { Env } from "../env";
 
-export async function verifyTurnstile(
-  env: Env,
-  token: string | undefined,
-  remoteIp: string | null,
-): Promise<boolean> {
-  const secret = env.TURNSTILE_SECRET_KEY;
-  if (!secret || secret.startsWith("1x000")) {
-    return true;
-  }
-  if (!token) {
-    return false;
-  }
-
-  const response = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({
-      secret,
-      response: token,
-      remoteip: remoteIp ?? undefined,
-    }),
-  });
-  const result = (await response.json()) as { success?: boolean };
-  return result.success === true;
-}
-
 export async function checkRateLimit(
   env: Env,
   ip: string | null,

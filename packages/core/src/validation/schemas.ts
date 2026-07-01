@@ -4,7 +4,6 @@ export const JobModeSchema = v.optional(v.picklist(["auto", "cloud", "browser"])
 
 export const CreateJobSchema = v.object({
   url: v.pipe(v.string(), v.trim(), v.minLength(1, "请粘贴教材页面链接")),
-  turnstileToken: v.optional(v.string()),
   mode: JobModeSchema,
 });
 

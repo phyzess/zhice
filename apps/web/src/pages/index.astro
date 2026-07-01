@@ -10,12 +10,6 @@ import Button from "../components/ui/Button.astro";
 import ProgressBar from "../components/ui/ProgressBar.astro";
 import StatusBadge from "../components/ui/StatusBadge.astro";
 import "../styles/global.css";
-
-const productionTurnstileSiteKey = "0x4AAAAAADtrPF5DctpTzakh";
-const testingTurnstileSiteKey = "1x00000000000000000000AA";
-const turnstileSiteKey =
-  import.meta.env.PUBLIC_TURNSTILE_SITE_KEY ??
-  (import.meta.env.DEV ? testingTurnstileSiteKey : productionTurnstileSiteKey);
 ---
 
 <!doctype html>
@@ -28,11 +22,6 @@ const turnstileSiteKey =
       content="织册把智慧教育平台教材网页整理成可保存的 PDF。"
     />
     <title>织册</title>
-    <script
-      src="https://challenges.cloudflare.com/turnstile/v0/api.js"
-      async
-      defer
-      is:inline></script>
   </head>
   <body>
     <main class="app-shell">
@@ -95,11 +84,8 @@ const turnstileSiteKey =
           </label>
 
           <div class="flex flex-wrap items-center justify-between gap-4">
-            <div
-              class="cf-turnstile border-4 border-black bg-white p-1 shadow-[4px_4px_0_0_#000]"
-              data-sitekey={turnstileSiteKey}
-              data-size="normal"
-            >
+            <div class="border-4 border-black bg-white px-4 py-3 text-sm font-black text-black shadow-[4px_4px_0_0_#000]">
+              公开预览链接会进行匿名限流保护。
             </div>
             <div class="flex flex-wrap gap-3 max-sm:w-full [&>button]:max-sm:w-full">
               <Button id="paste-submit-button" variant="secondary" full={false}>

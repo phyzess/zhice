@@ -16,7 +16,7 @@ import {
   updateJob,
   upsertMaterial,
 } from "../services/db";
-import { checkRateLimit, verifyTurnstile } from "../services/security";
+import { checkRateLimit } from "../services/security";
 
 export const jobsRoute = new Hono<{ Bindings: Env }>();
 
@@ -27,10 +27,6 @@ jobsRoute.post("/", vValidator("json", CreateJobSchema), async (c) => {
 
   if (!(await checkRateLimit(env, remoteIp, "create-job"))) {
     return c.json({ error: "提交太频繁，请稍后再试" }, 429);
-  }
-
-  if (!(await verifyTurnstile(env, input.turnstileToken, remoteIp))) {
-    return c.json({ error: "人机验证失败，请刷新后重试" }, 400);
   }
 
   let contentId: string;

@@ -16,7 +16,6 @@ wrangler r2 bucket create zhice
 设置 secrets：
 
 ```bash
-wrangler secret put TURNSTILE_SECRET_KEY
 wrangler secret put OPS_TOKEN
 wrangler secret put RATE_LIMIT_PEPPER
 ```
