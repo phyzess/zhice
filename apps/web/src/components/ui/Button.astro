@@ -1,0 +1,39 @@
+---
+type Variant = "primary" | "secondary" | "ghost" | "danger";
+
+const {
+  variant = "primary",
+  type = "button",
+  id,
+  disabled = false,
+  full = false,
+} = Astro.props as {
+  variant?: Variant;
+  type?: "button" | "submit" | "reset";
+  id?: string;
+  disabled?: boolean;
+  full?: boolean;
+};
+
+const variants = {
+  primary:
+    "bg-[var(--color-primary)] text-black hover:bg-[var(--color-primary-strong)]",
+  secondary:
+    "bg-[var(--color-secondary)] text-black hover:bg-white",
+  ghost: "bg-white text-black hover:bg-[var(--color-violet)]",
+  danger: "bg-black text-white hover:bg-[var(--color-primary)] hover:text-black",
+};
+---
+
+<button
+  id={id}
+  type={type}
+  disabled={disabled}
+  class:list={[
+    "inline-flex min-h-12 items-center justify-center gap-2 border-4 border-black px-4 py-2 text-sm font-black uppercase tracking-wide shadow-[4px_4px_0_0_#000] transition-[transform,box-shadow,background-color,color] duration-100 ease-linear active:translate-x-1 active:translate-y-1 active:shadow-none disabled:cursor-not-allowed disabled:bg-white disabled:opacity-55",
+    variants[variant],
+    full && "w-full",
+  ]}
+>
+  <slot />
+</button>

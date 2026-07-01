@@ -1,0 +1,67 @@
+{
+  "name": "zhice",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "pnpm --filter @zhice/web build && wrangler dev --local --port 8787 --config wrangler.jsonc",
+    "dev:web": "pnpm --filter @zhice/web dev",
+    "dev:vp": "pnpm --filter @zhice/web build && vp dev",
+    "build": "pnpm --filter @zhice/web build && vp build",
+    "deploy": "pnpm build && wrangler deploy",
+    "check": "vp check && pnpm --filter @zhice/web check",
+    "fix": "vp check --fix",
+    "test": "vp test",
+    "test:worker": "vitest run --config vitest.worker.config.ts",
+    "test:browser": "vitest --browser.enabled --config vitest.browser.config.ts",
+    "test:e2e": "playwright test",
+    "inspect": "VITE_INSPECT=true pnpm dev:vp",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate:local": "wrangler d1 migrations apply ZHICE_DB --local",
+    "ops:stats": "tsx scripts/ops.ts stats",
+    "ops:retry": "tsx scripts/ops.ts retry",
+    "ops:purge": "tsx scripts/ops.ts purge",
+    "verify:local": "tsx scripts/verify-local-sample.ts",
+    "verify:production": "tsx scripts/verify-production.ts"
+  },
+  "dependencies": {
+    "@hono/valibot-validator": "^0.6.1",
+    "@zhice/core": "workspace:*",
+    "@zhice/db": "workspace:*",
+    "drizzle-orm": "^0.45.1",
+    "hono": "^4.12.27",
+    "valibot": "^1.4.1"
+  },
+  "devDependencies": {
+    "@astrojs/check": "^0.9.4",
+    "@cloudflare/vite-plugin": "^1.42.2",
+    "@cloudflare/vitest-pool-workers": "^0.16.19",
+    "@iconify-json/lucide": "^1.2.114",
+    "@playwright/test": "^1.61.1",
+    "@tailwindcss/vite": "^4.3.1",
+    "@types/node": "^25.0.3",
+    "@vitest/browser": "^4.1.9",
+    "@vitest/browser-playwright": "^4.1.9",
+    "astro": "^5.16.4",
+    "drizzle-kit": "^0.31.8",
+    "oxlint": "^1.71.0",
+    "tailwindcss": "^4.3.1",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3",
+    "unplugin-icons": "^23.0.1",
+    "vite": "^7.2.7",
+    "vite-plugin-checker": "^0.14.4",
+    "vite-plugin-inspect": "^11.4.1",
+    "vite-plus": "^0.2.1",
+    "vitest": "^4.1.9",
+    "wrangler": "^4.58.0"
+  },
+  "packageManager": "pnpm@10.25.0",
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild",
+      "sharp",
+      "workerd"
+    ]
+  }
+}

@@ -1,0 +1,191 @@
+---
+import AlertTriangle from "~icons/lucide/alert-triangle";
+import Download from "~icons/lucide/download";
+import FileText from "~icons/lucide/file-text";
+import LoaderCircle from "~icons/lucide/loader-circle";
+import RefreshCw from "~icons/lucide/refresh-cw";
+import ShieldCheck from "~icons/lucide/shield-check";
+import Trash2 from "~icons/lucide/trash-2";
+import Button from "../components/ui/Button.astro";
+import ProgressBar from "../components/ui/ProgressBar.astro";
+import StatusBadge from "../components/ui/StatusBadge.astro";
+import "../styles/global.css";
+
+const turnstileSiteKey =
+  import.meta.env.PUBLIC_TURNSTILE_SITE_KEY ?? "1x00000000000000000000AA";
+---
+
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="description"
+      content="织册把智慧教育平台教材网页整理成可保存的 PDF。"
+    />
+    <title>织册</title>
+    <script
+      src="https://challenges.cloudflare.com/turnstile/v0/api.js"
+      async
+      defer
+      is:inline></script>
+  </head>
+  <body>
+    <main class="app-shell">
+      <section class="mb-8 grid items-end gap-6 lg:grid-cols-[1.25fr_0.75fr]">
+        <div class="neo-enter">
+          <div class="neo-label -rotate-1">
+            <ShieldCheck class="size-4 stroke-[4px]" />
+            Public Preview Only
+          </div>
+          <h1 class="mt-6 grid max-w-3xl gap-2 text-[clamp(4rem,13vw,9rem)] font-black leading-[0.84] tracking-tighter text-black">
+            <span>织册</span>
+            <span class="neo-outline-text text-[0.58em] uppercase tracking-tight">
+              Zhice
+            </span>
+          </h1>
+          <p class="mt-5 max-w-2xl border-l-8 border-black bg-white px-4 py-3 text-xl font-black leading-snug shadow-[6px_6px_0_0_#000] max-sm:text-lg">
+            把教材网页整理成可保存的 PDF。粘贴链接，等它整理好，下载后就可以关掉页面。
+          </p>
+        </div>
+
+        <aside class="neo-panel rotate-1 bg-[var(--color-secondary)] p-5 max-lg:rotate-0">
+          <div class="mb-4 flex items-center gap-3 border-b-4 border-black pb-3 text-sm font-black uppercase tracking-[0.18em]">
+            <FileText class="size-5 stroke-[4px]" />
+            一次性流程
+          </div>
+          <ol class="grid gap-3 text-base font-black">
+            <li class="flex items-center gap-3">
+              <span class="grid size-9 place-items-center border-4 border-black bg-white shadow-[3px_3px_0_0_#000]">1</span>
+              粘贴教材链接
+            </li>
+            <li class="flex items-center gap-3">
+              <span class="grid size-9 place-items-center border-4 border-black bg-white shadow-[3px_3px_0_0_#000]">2</span>
+              等待整理进度
+            </li>
+            <li class="flex items-center gap-3">
+              <span class="grid size-9 place-items-center border-4 border-black bg-white shadow-[3px_3px_0_0_#000]">3</span>
+              下载后关闭页面
+            </li>
+          </ol>
+        </aside>
+      </section>
+
+      <section class="neo-panel-large relative bg-[var(--color-violet)] p-5 sm:p-7">
+        <div class="absolute -right-3 -top-5 rotate-3 border-4 border-black bg-[var(--color-primary)] px-4 py-2 text-sm font-black uppercase tracking-widest shadow-[4px_4px_0_0_#000]">
+          Ready
+        </div>
+        <form id="job-form" class="grid gap-4">
+          <label class="grid gap-2">
+            <span class="text-sm font-black uppercase tracking-[0.18em] text-black">
+              教材链接
+            </span>
+            <input
+              id="material-url"
+              name="url"
+              class="neo-input"
+              placeholder="粘贴 basic.smartedu.cn 教材链接"
+              autocomplete="off"
+              inputmode="url"
+            />
+          </label>
+
+          <div class="flex flex-wrap items-center justify-between gap-4">
+            <div
+              class="cf-turnstile border-4 border-black bg-white p-1 shadow-[4px_4px_0_0_#000]"
+              data-sitekey={turnstileSiteKey}
+              data-size="normal"
+            >
+            </div>
+            <div class="flex flex-wrap gap-3 max-sm:w-full [&>button]:max-sm:w-full">
+              <Button id="paste-submit-button" variant="secondary" full={false}>
+                <FileText class="size-4" />
+                粘贴并生成
+              </Button>
+              <Button id="submit-button" type="submit" full={false}>
+                <Download class="size-4" />
+                生成 PDF
+              </Button>
+            </div>
+          </div>
+
+          <p
+            id="form-message"
+            class="m-0 hidden border-4 border-black bg-[var(--color-primary)] p-3 text-sm font-black text-black shadow-[4px_4px_0_0_#000]"
+          >
+          </p>
+          <p
+            id="browser-warning"
+            class="m-0 hidden border-4 border-black bg-[var(--color-secondary)] p-3 text-sm font-black text-black shadow-[4px_4px_0_0_#000]"
+          >
+            <AlertTriangle class="mr-2 inline size-4 align-[-2px] stroke-[4px]" />
+            <span id="browser-warning-text"></span>
+          </p>
+        </form>
+      </section>
+
+      <section
+        id="task-card"
+        class="neo-panel mt-7 hidden bg-white p-5 sm:p-6"
+        aria-live="polite"
+      >
+        <div class="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <div class="mb-2 flex flex-wrap items-center gap-2">
+              <StatusBadge id="task-status">准备中</StatusBadge>
+              <span
+                id="task-mode"
+                class="border-4 border-black bg-[var(--color-secondary)] px-2 py-1 text-xs font-black uppercase tracking-widest shadow-[3px_3px_0_0_#000]"
+              >
+              </span>
+            </div>
+            <h2 id="task-title" class="m-0 text-2xl font-black leading-tight text-black">
+              正在读取教材信息
+            </h2>
+            <p id="task-summary" class="mt-2 text-sm font-black uppercase tracking-wide text-black">
+            </p>
+          </div>
+          <LoaderCircle id="task-spinner" class="size-8 animate-spin text-black" />
+        </div>
+        <div class="mt-5">
+          <ProgressBar id="task-progress" />
+          <p id="task-message" class="mt-3 border-l-8 border-black bg-[var(--color-secondary)] px-3 py-2 text-sm font-black text-black">
+            正在准备...
+          </p>
+        </div>
+        <div class="mt-5 flex flex-wrap gap-3 [&>button]:max-sm:w-full">
+          <Button id="download-button" variant="primary">
+            <Download class="size-4" />
+            下载 PDF
+          </Button>
+          <Button id="fallback-button" variant="secondary">
+            <RefreshCw class="size-4" />
+            改用本机生成
+          </Button>
+          <Button id="copy-button" variant="ghost">复制下载链接</Button>
+          <Button id="reset-button" variant="ghost">重新开始</Button>
+        </div>
+      </section>
+
+      <div class="neo-divider mt-10"></div>
+
+      <section class="neo-panel mt-7 bg-white p-5 sm:p-6">
+        <div class="mb-5 flex items-start justify-between gap-3 max-sm:flex-col">
+          <div>
+            <h2 class="m-0 text-3xl font-black leading-none tracking-tight">最近下载</h2>
+          </div>
+          <Button id="clear-history-button" variant="danger">
+            <Trash2 class="size-4" />
+            清空
+          </Button>
+        </div>
+        <div id="history-list" class="grid gap-3"></div>
+        <p id="empty-history" class="m-0 border-4 border-dashed border-black bg-[var(--color-violet)] p-5 text-base font-black text-black">
+          生成过的教材会显示在这里，方便再次下载。
+        </p>
+      </section>
+    </main>
+    <script src="../client/app.ts"></script>
+  </body>
+</html>

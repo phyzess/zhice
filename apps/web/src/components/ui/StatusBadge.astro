@@ -1,0 +1,23 @@
+---
+const { id, tone = "muted" } = Astro.props as {
+  id?: string;
+  tone?: "muted" | "info" | "success" | "warning" | "danger";
+};
+const tones = {
+  muted: "bg-white text-black",
+  info: "bg-[var(--color-violet)] text-black",
+  success: "bg-[var(--color-success)] text-black",
+  warning: "bg-[var(--color-secondary)] text-black",
+  danger: "bg-[var(--color-primary)] text-black",
+};
+---
+
+<span
+  id={id}
+  class:list={[
+    "inline-flex items-center rounded-full border-4 border-black px-3 py-1 text-xs font-black uppercase tracking-widest shadow-[3px_3px_0_0_#000]",
+    tones[tone],
+  ]}
+>
+  <slot />
+</span>

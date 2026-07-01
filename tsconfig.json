@@ -1,0 +1,30 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "strict": true,
+    "skipLibCheck": true,
+    "allowJs": false,
+    "noEmit": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "baseUrl": ".",
+    "paths": {
+      "@zhice/core": ["packages/core/src/index.ts"],
+      "@zhice/core/*": ["packages/core/src/*"],
+      "@zhice/db": ["packages/db/src/index.ts"],
+      "@zhice/db/*": ["packages/db/src/*"]
+    }
+  },
+  "include": [
+    "apps/**/*.ts",
+    "apps/**/*.astro",
+    "packages/**/*.ts",
+    "scripts/**/*.ts",
+    "test/**/*.ts",
+    "vite.config.ts",
+    "vitest*.config.ts"
+  ]
+}

@@ -1,0 +1,55 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "zhice",
+  "main": "apps/worker/src/index.ts",
+  "compatibility_date": "2026-06-30",
+  "compatibility_flags": ["nodejs_compat"],
+  "limits": {
+    "cpu_ms": 300000,
+  },
+  "assets": {
+    "directory": "./apps/web/dist",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*"],
+  },
+  "vars": {
+    "ENVIRONMENT": "production",
+    "TURNSTILE_SITE_KEY": "1x00000000000000000000AA",
+  },
+  "d1_databases": [
+    {
+      "binding": "ZHICE_DB",
+      "database_name": "zhice",
+      "database_id": "4d3b0f33-59af-450d-809e-9a24cae842ab",
+      "migrations_dir": "packages/db/migrations",
+    },
+  ],
+  "r2_buckets": [
+    {
+      "binding": "ZHICE_BUCKET",
+      "bucket_name": "zhice",
+    },
+  ],
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "MATERIAL_COORDINATOR",
+        "class_name": "MaterialCoordinator",
+      },
+    ],
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["MaterialCoordinator"],
+    },
+  ],
+  "workflows": [
+    {
+      "name": "zhice-pdf-workflow",
+      "binding": "PDF_WORKFLOW",
+      "class_name": "PdfWorkflow",
+    },
+  ],
+}

@@ -1,0 +1,12 @@
+---
+const { id, value = 0 } = Astro.props as { id?: string; value?: number };
+---
+
+<div class="h-6 w-full overflow-hidden border-4 border-black bg-white" aria-hidden="true">
+  <div
+    id={id}
+    class="h-full bg-[var(--color-secondary)] transition-all duration-200 ease-linear"
+    style={`width: ${Math.max(0, Math.min(100, value))}%`}
+  >
+  </div>
+</div>

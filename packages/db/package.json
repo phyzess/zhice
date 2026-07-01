@@ -1,0 +1,13 @@
+{
+  "name": "@zhice/db",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./*": "./src/*"
+  },
+  "dependencies": {
+    "drizzle-orm": "^0.45.1"
+  }
+}
