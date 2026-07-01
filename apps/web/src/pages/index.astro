@@ -22,7 +22,7 @@ import "../styles/global.css";
       content="织册把智慧教育平台教材网页整理成可保存的 PDF。"
     />
     <title>织册</title>
-    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="icon" href="/favicon.png" type="image/png" />
   </head>
   <body>
     <main class="app-shell">
@@ -33,14 +33,28 @@ import "../styles/global.css";
             Public Preview Only
           </div>
           <h1 class="sr-only">织册 Zhice</h1>
-          <img
-            class="mt-6 block w-full max-w-[700px]"
-            src="/logo.svg"
-            alt="织册 Zhice"
-            width="760"
-            height="220"
-            decoding="async"
-          />
+          <div class="mt-6 flex max-w-[700px] items-center gap-8 max-sm:gap-4">
+            <img
+              class="block h-[190px] w-auto shrink-0 max-sm:h-[112px]"
+              src="/logo-icon.png"
+              alt=""
+              width="262"
+              height="206"
+              decoding="async"
+            />
+            <div class="grid gap-2">
+              <div class="text-[clamp(4.5rem,9vw,7rem)] font-black leading-none text-black max-sm:text-[3.7rem]">
+                织册
+              </div>
+              <div class="flex items-center gap-4">
+                <span class="h-2 w-9 bg-[var(--color-primary)]"></span>
+                <span class="text-4xl font-black leading-none tracking-[0.42em] text-black max-sm:text-2xl">
+                  ZHICE
+                </span>
+                <span class="h-2 w-9 bg-[var(--color-secondary)]"></span>
+              </div>
+            </div>
+          </div>
           <p class="mt-5 max-w-2xl border-l-8 border-black bg-white px-4 py-3 text-xl font-black leading-snug shadow-[6px_6px_0_0_#000] max-sm:text-lg">
             把教材网页整理成可保存的 PDF。粘贴链接，等它整理好，下载后就可以关掉页面。
           </p>

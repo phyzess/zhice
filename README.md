@@ -1,6 +1,6 @@
 # 织册
 
-![织册 Zhice](apps/web/public/logo.svg)
+![织册 Zhice](apps/web/public/logo-icon.png)
 
 织册是一个即来即走的教材 PDF 整理工具。老师打开网页，粘贴国家中小学智慧教育平台教材链接，等待系统整理页面，下载 PDF 后即可关闭页面。
 
