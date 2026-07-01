@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="760" height="220" viewBox="0 0 760 220" role="img" aria-labelledby="title desc">
+  <title id="title">织册 Zhice</title>
+  <desc id="desc">A woven booklet mark for Zhice, a tool that turns public textbook web pages into PDF booklets.</desc>
+  <rect width="760" height="220" fill="#fffdf5"/>
+  <g transform="translate(18 20)">
+    <rect x="20" y="20" width="158" height="158" fill="#000"/>
+    <rect x="8" y="8" width="158" height="158" fill="#fff" stroke="#000" stroke-width="8"/>
+    <path d="M36 36h104v124H36z" fill="#fffdf5" stroke="#000" stroke-width="8" stroke-linejoin="round"/>
+    <path d="M52 48v98M88 48v98M124 48v98" stroke="#000" stroke-width="12" stroke-linecap="square"/>
+    <path d="M44 72h96M44 108h96M44 144h96" stroke="#000" stroke-width="10" stroke-linecap="square"/>
+    <path d="M50 72h30v36H50zM96 108h30v36H96z" fill="#ffd93d" stroke="#000" stroke-width="6"/>
+    <path d="M80 72h46v36H80zM50 108h46v36H50z" fill="#ff6b6b" stroke="#000" stroke-width="6"/>
+    <path d="M140 34l24 14-24 14z" fill="#ffd93d" stroke="#000" stroke-width="6" stroke-linejoin="round"/>
+    <path d="M24 156h116" stroke="#000" stroke-width="8" stroke-linecap="square"/>
+  </g>
+  <g transform="translate(230 46)">
+    <text x="0" y="76" fill="#000" font-family="Arial Black, Microsoft YaHei, PingFang SC, sans-serif" font-size="76" font-weight="900">织册</text>
+    <text x="2" y="132" fill="none" stroke="#000" stroke-width="2.4" font-family="Arial Black, Space Grotesk, sans-serif" font-size="54" font-weight="900">ZHICE</text>
+    <path d="M4 154h270" stroke="#000" stroke-width="8"/>
+    <path d="M294 139h86v36h-86z" fill="#ffd93d" stroke="#000" stroke-width="6"/>
+    <text x="313" y="164" fill="#000" font-family="Arial Black, Space Grotesk, sans-serif" font-size="18" font-weight="900">PDF</text>
+  </g>
+</svg>

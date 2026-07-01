@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128" role="img" aria-labelledby="title">
+  <title id="title">织册</title>
+  <rect width="128" height="128" fill="#fffdf5"/>
+  <rect x="21" y="21" width="88" height="88" fill="#000"/>
+  <rect x="13" y="13" width="88" height="88" fill="#fff" stroke="#000" stroke-width="7"/>
+  <path d="M29 29h56v72H29z" fill="#fffdf5" stroke="#000" stroke-width="7" stroke-linejoin="round"/>
+  <path d="M40 38v54M57 38v54M74 38v54" stroke="#000" stroke-width="8" stroke-linecap="square"/>
+  <path d="M34 52h56M34 70h56M34 88h56" stroke="#000" stroke-width="7" stroke-linecap="square"/>
+  <path d="M37 52h17v18H37zM62 70h17v18H62z" fill="#ffd93d" stroke="#000" stroke-width="4"/>
+  <path d="M54 52h25v18H54zM37 70h25v18H37z" fill="#ff6b6b" stroke="#000" stroke-width="4"/>
+</svg>
