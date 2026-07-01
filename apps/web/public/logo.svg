@@ -1,26 +1,28 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="760" height="220" viewBox="0 0 760 220" role="img" aria-labelledby="title desc">
   <title id="title">织册 Zhice</title>
   <desc id="desc">A transparent logo mark showing woven textbook pages beside the Zhice wordmark.</desc>
-  <g fill="none" stroke="#000" stroke-linecap="square" stroke-linejoin="round">
-    <g transform="translate(48 18)">
-      <path d="M42 148V50c0-26 18-42 42-42h92v140H60c-12 0-18 7-18 18" fill="#fffdf5" stroke-width="8"/>
-      <path d="M42 148c0-14 10-24 26-24h122v52H68c-16 0-26-11-26-28Z" fill="#fffdf5" stroke-width="8"/>
-      <path d="M70 140h102M70 153h102M70 166h102" stroke-width="5"/>
+  <g fill="none" stroke="#000" stroke-linejoin="round">
+    <g transform="translate(46 18)">
+      <path d="M42 137V49c0-24 16-38 40-38h91v126H64c-14 0-22 8-22 22" fill="#fffdf5" stroke-width="7" stroke-linecap="round"/>
+      <path d="M42 158c0-13 10-22 25-22h120v42H67c-15 0-25-8-25-20Z" fill="#fffdf5" stroke-width="7" stroke-linecap="round"/>
+      <path d="M66 149h104M66 160h104M66 171h104" stroke-width="4.5" stroke-linecap="square"/>
 
-      <path d="M74 30h90v96H74z" fill="#fffdf5" stroke-width="7"/>
-      <path d="M97 30v96M126 30v96M155 30v96" stroke-width="7"/>
-      <path d="M74 57h112M74 83h100M74 109h100" stroke-width="7"/>
+      <path d="M72 30h103v106H72z" fill="#fffdf5" stroke-width="5.5" stroke-linecap="square"/>
+      <path d="M100 30v106M129 30v106M157 30v106" stroke-width="5.5" stroke-linecap="square"/>
+      <path d="M72 56h124M72 82h111M72 108h111" stroke-width="5.5" stroke-linecap="square"/>
 
-      <path d="M99 56h28v16H99zM154 80h27v18h-27zM129 57h22v69h-22z" fill="#ffd93d" stroke-width="5"/>
-      <path d="M74 72h53v18H74zM74 98h55v20H74zM165 58h48v18h-48z" fill="#ff6b6b" stroke-width="5"/>
-      <path d="M176 8h22v62h-22z" fill="#ffd93d" stroke-width="5"/>
+      <path d="M145 0h20v58h-20z" fill="#ffd93d" stroke-width="4.5" stroke-linecap="square"/>
+      <path d="M164 49h54v17h-54z" fill="#ff6b6b" stroke-width="4.5" stroke-linecap="square"/>
+      <path d="M164 78h36v17h-36z" fill="#ffd93d" stroke-width="4.5" stroke-linecap="square"/>
+      <path d="M101 64h31v16h-31zM131 82h16v16h-16z" fill="#ff6b6b" stroke-width="4.5" stroke-linecap="square"/>
+      <path d="M132 57h15v79h-15zM155 79h17v17h-17z" fill="#ffd93d" stroke-width="4.5" stroke-linecap="square"/>
     </g>
 
     <g transform="translate(294 26)">
       <text x="0" y="98" fill="#000" stroke="none" font-family="Arial Black, Microsoft YaHei, PingFang SC, sans-serif" font-size="102" font-weight="900">织册</text>
-      <path d="M8 152h34" stroke="#ff6b6b" stroke-width="7"/>
+      <path d="M8 152h34" stroke="#ff6b6b" stroke-width="7" stroke-linecap="square"/>
       <text x="62" y="166" fill="#000" stroke="none" font-family="Arial Black, Space Grotesk, sans-serif" font-size="36" font-weight="900" letter-spacing="14">ZHICE</text>
-      <path d="M344 152h34" stroke="#ffd93d" stroke-width="7"/>
+      <path d="M344 152h34" stroke="#ffd93d" stroke-width="7" stroke-linecap="square"/>
     </g>
   </g>
 </svg>
