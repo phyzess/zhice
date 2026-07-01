@@ -11,8 +11,11 @@ import ProgressBar from "../components/ui/ProgressBar.astro";
 import StatusBadge from "../components/ui/StatusBadge.astro";
 import "../styles/global.css";
 
+const productionTurnstileSiteKey = "0x4AAAAAADtrPF5DctpTzakh";
+const testingTurnstileSiteKey = "1x00000000000000000000AA";
 const turnstileSiteKey =
-  import.meta.env.PUBLIC_TURNSTILE_SITE_KEY ?? "1x00000000000000000000AA";
+  import.meta.env.PUBLIC_TURNSTILE_SITE_KEY ??
+  (import.meta.env.DEV ? testingTurnstileSiteKey : productionTurnstileSiteKey);
 ---
 
 <!doctype html>
