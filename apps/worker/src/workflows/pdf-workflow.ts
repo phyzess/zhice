@@ -1,21 +1,19 @@
-import { fetchSmartEduManifest, PdfWriter, type MaterialManifest } from "@zhice/core";
+import { buildPdfVersionKey, buildR2Key, PdfWriter, type MaterialManifest } from "@zhice/core";
 import { WorkflowEntrypoint, type WorkflowEvent, type WorkflowStep } from "cloudflare:workers";
+import { getPdfConfig } from "../config";
 import type { Env, PdfWorkflowParams } from "../env";
-import {
-  getMaterial,
-  markMaterialFailed,
-  markMaterialReady,
-  recordUsage,
-  updateJob,
-  upsertMaterial,
-} from "../services/db";
-import { fetchPageImage } from "../services/images";
+import { completeGeneration, failGeneration, getMaterial, updateJob } from "../services/db";
+import { prefetchPagesInOrder } from "../services/images";
 import { R2MultipartPdfSink } from "../services/r2-multipart-sink";
+import { HeaderSemaphore } from "../services/concurrency";
 
 export class PdfWorkflow extends WorkflowEntrypoint<Env, PdfWorkflowParams> {
   async run(event: WorkflowEvent<PdfWorkflowParams>, step: WorkflowStep): Promise<void> {
     const payload = event.payload;
-    const manifest = await step.do("resolve", async () => {
+    const config = getPdfConfig(this.env as unknown as Record<string, unknown>);
+
+    // Step 1: Resolve manifest.
+    const manifest = await step.do("resolve manifest", async () => {
       await updateJob(this.env, payload.jobId, { status: "resolving" });
       const material = await getMaterial(this.env, payload.contentId);
       if (material) {
@@ -27,37 +25,137 @@ export class PdfWorkflow extends WorkflowEntrypoint<Env, PdfWorkflowParams> {
           imageSignature: material.image_signature,
         } satisfies MaterialManifest;
       }
-      const fetched = await fetchSmartEduManifest(payload.contentId);
-      await upsertMaterial(this.env, fetched, "resolved");
-      return fetched;
+      // If material isn't in DB (shouldn't happen), the caller must ensure it's upserted first.
+      throw new Error("Material not found in database");
     });
 
-    try {
-      await step.do(
-        "generate and upload",
-        {
-          timeout: "20 minutes",
-        },
-        async () => {
-          await generatePdf(this.env, payload.jobId, manifest);
-        },
+    // Step 2: Renew single-flight lease.
+    await step.do("renew single flight", async () => {
+      await renewSingleFlight(this.env, payload.contentId, payload.jobId);
+    });
+
+    // Step 3: Generate artifact (idempotent).
+    const result = await step.do(
+      "generate artifact",
+      {
+        timeout: "20 minutes",
+      },
+      async () => {
+        return generateArtifact(this.env, payload, manifest, config);
+      },
+    );
+
+    // Step 4: Commit ready state (atomically).
+    const committed = await step.do("commit ready state", async () => {
+      return completeGeneration(
+        this.env,
+        payload.contentId,
+        manifest.imageSignature,
+        result.r2Key,
+        result.size,
+        result.etag,
+        result.pdfVersion,
+        config.generatorVersion,
+        payload.jobId,
+        manifest.pageCount,
+        result.metrics,
       );
-    } finally {
-      await releaseSingleFlight(this.env, payload.contentId);
+    });
+
+    if (!committed) {
+      // Manifest changed during generation — clean up and mark as canceled.
+      await deleteR2Object(this.env, result.r2Key);
+      await updateJob(this.env, payload.jobId, {
+        status: "canceled",
+        error: "教材版本已更新，请重新提交",
+        finishedAt: Date.now(),
+      });
     }
+
+    // Step 5: Release single-flight.
+    await step.do("release single flight", async () => {
+      await releaseSingleFlight(this.env, payload.contentId, payload.jobId);
+    });
   }
 }
 
-async function generatePdf(env: Env, jobId: string, manifest: MaterialManifest): Promise<void> {
-  const r2Key = `materials/${manifest.contentId}/${manifest.imageSignature.replaceAll("/", "_")}.pdf`;
-  const sink = await R2MultipartPdfSink.create(env.ZHICE_BUCKET, r2Key);
+type ArtifactResult = {
+  r2Key: string;
+  size: number;
+  etag: string;
+  pdfVersion: string;
+  metrics: Record<string, unknown>;
+};
+
+async function generateArtifact(
+  env: Env,
+  params: PdfWorkflowParams,
+  manifest: MaterialManifest,
+  config: ReturnType<typeof getPdfConfig>,
+): Promise<ArtifactResult> {
+  const pdfVersion = await buildPdfVersionKey(manifest.imageSignature, config.generatorVersion);
+  const r2Key = buildR2Key(manifest.contentId, pdfVersion);
+
+  // Idempotency: check if object already exists.
+  const existing = await env.ZHICE_BUCKET.head(r2Key);
+  if (existing) {
+    const customMeta = existing.customMetadata ?? {};
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const meta = customMeta as Record<string, any>;
+    if (meta.pdfVersion === pdfVersion) {
+      console.log(
+        JSON.stringify({
+          type: "pdf_generation_idempotent",
+          contentId: manifest.contentId,
+          r2Key,
+        }),
+      );
+      return {
+        r2Key,
+        size: existing.size,
+        etag: existing.httpEtag ?? "",
+        pdfVersion,
+        metrics: { reused: true },
+      };
+    }
+    // Object exists but metadata doesn't match — delete and regenerate.
+    await env.ZHICE_BUCKET.delete(r2Key);
+  }
+
+  const start = Date.now();
+  const semaphore = new HeaderSemaphore(config.fetchConcurrency + config.uploadConcurrency);
+
+  const sink = await R2MultipartPdfSink.create(env.ZHICE_BUCKET, r2Key, {
+    partSize: config.partSizeBytes,
+    uploadConcurrency: config.uploadConcurrency,
+    semaphore,
+    httpMetadata: {
+      contentType: "application/pdf",
+      contentDisposition: `attachment; filename*=UTF-8''${encodeURIComponent(sanitizeFilename(manifest.title))}.pdf`,
+      cacheControl: "public, max-age=31536000, immutable",
+    },
+    customMetadata: {
+      contentId: manifest.contentId,
+      pdfVersion,
+      generatorVersion: config.generatorVersion,
+      pageCount: String(manifest.pageCount),
+    },
+  });
+
   const writer = new PdfWriter(sink, { title: manifest.title });
+
+  let pageRetries = 0;
+  let fetchStart = 0;
+  let fetchAggregate = 0;
+  let lastProgressPage = 0;
+
   try {
-    await updateJob(env, jobId, {
+    await updateJob(env, params.jobId, {
       status: "generating",
       title: manifest.title,
       pageCount: manifest.pageCount,
     });
+
     await env.ZHICE_DB.prepare(
       "UPDATE materials SET status = 'generating', updated_at = ? WHERE content_id = ?",
     )
@@ -65,49 +163,128 @@ async function generatePdf(env: Env, jobId: string, manifest: MaterialManifest):
       .run();
 
     await writer.start();
-    for (let page = 1; page <= manifest.pageCount; page += 1) {
-      const bytes = await fetchPageImage(manifest, page);
+    fetchStart = Date.now();
+
+    for await (const { bytes } of prefetchPagesInOrder(manifest, {
+      concurrency: config.fetchConcurrency,
+      semaphore,
+      onPageFetched: (page) => {
+        // Update progress every 10 pages or at least 1 second apart.
+        const now = Date.now();
+        if (page % 10 === 0 || page === manifest.pageCount || now - lastProgressPage >= 1000) {
+          lastProgressPage = now;
+          env.ZHICE_DB.prepare("UPDATE jobs SET completed_pages = ?, updated_at = ? WHERE id = ?")
+            .bind(page, now, params.jobId)
+            .run()
+            .catch(() => {
+              // Fire-and-forget progress update — best effort.
+            });
+        }
+      },
+    })) {
       await writer.addJpegPage({ bytes });
-      if (page % 5 === 0 || page === manifest.pageCount) {
-        await updateJob(env, jobId, {
-          status: page === manifest.pageCount ? "uploading" : "generating",
-          completedPages: page,
-        });
-      }
     }
-    await writer.finish();
-    const result = await sink.complete();
-    await markMaterialReady(env, manifest.contentId, r2Key, result.size);
-    await updateJob(env, jobId, {
-      status: "succeeded",
+
+    fetchAggregate = Date.now() - fetchStart;
+
+    // Signal uploading phase.
+    await updateJob(env, params.jobId, {
+      status: "uploading",
       completedPages: manifest.pageCount,
-      downloadUrl: `/api/materials/${manifest.contentId}/download`,
-      error: null,
-      finishedAt: Date.now(),
     });
-    await recordUsage(env, "cloud_succeeded", manifest.contentId, {
+
+    await writer.finish();
+
+    const uploadStart = Date.now();
+    const result = await sink.complete();
+    const uploadDrainMs = Date.now() - uploadStart;
+
+    const totalMs = Date.now() - start;
+    const metrics = {
+      manifestMs: 0, // measured outside workflow
+      queueMs: 0,
+      pageFetchWallMs: fetchAggregate,
+      pageFetchAggregateMs: fetchAggregate,
+      pdfWriteMs: totalMs - fetchAggregate - uploadDrainMs,
+      uploadDrainMs,
+      totalMs,
       bytes: result.size,
       pages: manifest.pageCount,
-    });
+      pageRetries,
+      fetchConcurrency: config.fetchConcurrency,
+      uploadConcurrency: config.uploadConcurrency,
+    };
+
+    console.log(
+      JSON.stringify({
+        type: "pdf_generation_completed",
+        jobId: params.jobId,
+        contentId: manifest.contentId,
+        generatorVersion: config.generatorVersion,
+        ...metrics,
+      }),
+    );
+
+    return {
+      r2Key,
+      size: result.size,
+      etag: result.etag,
+      pdfVersion,
+      metrics,
+    };
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
+    // Abort multipart upload — best-effort.
     try {
       await sink.abort();
     } catch {
-      // The user-facing fallback matters more than cleaning up a failed multipart session.
+      // Ignore.
     }
-    await markMaterialFailed(env, manifest.contentId, message);
-    await updateJob(env, jobId, {
-      status: "fallback_ready",
-      error: "云端生成失败，已准备本机生成",
-      finishedAt: Date.now(),
-    });
-    await recordUsage(env, "cloud_failed", manifest.contentId, { error: message });
+
+    const message = error instanceof Error ? error.message : String(error);
+    console.log(
+      JSON.stringify({
+        type: "pdf_generation_failed",
+        jobId: params.jobId,
+        contentId: manifest.contentId,
+        error: message,
+      }),
+    );
+
+    await failGeneration(env, manifest.contentId, params.jobId, message);
+    throw error;
   }
 }
 
-async function releaseSingleFlight(env: Env, contentId: string): Promise<void> {
+async function renewSingleFlight(env: Env, contentId: string, jobId: string): Promise<void> {
   const id = env.MATERIAL_COORDINATOR.idFromName(contentId);
   const stub = env.MATERIAL_COORDINATOR.get(id);
-  await stub.fetch("https://coordinator/release", { method: "POST" });
+  await stub.fetch("https://coordinator/renew", {
+    method: "POST",
+    body: JSON.stringify({ jobId }),
+  });
+}
+
+async function releaseSingleFlight(env: Env, contentId: string, jobId: string): Promise<void> {
+  const id = env.MATERIAL_COORDINATOR.idFromName(contentId);
+  const stub = env.MATERIAL_COORDINATOR.get(id);
+  await stub.fetch("https://coordinator/release", {
+    method: "POST",
+    body: JSON.stringify({ jobId }),
+  });
+}
+
+async function deleteR2Object(env: Env, key: string): Promise<void> {
+  try {
+    await env.ZHICE_BUCKET.delete(key);
+  } catch {
+    // Best-effort.
+  }
+}
+
+function sanitizeFilename(value: string): string {
+  return value
+    .replace(/[\\/:*?"<>|]/g, "_")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 90);
 }

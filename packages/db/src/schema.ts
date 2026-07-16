@@ -10,16 +10,20 @@ export const materials = sqliteTable(
     imageSignature: text("image_signature").notNull(),
     pdfR2Key: text("pdf_r2_key"),
     pdfSize: integer("pdf_size"),
+    pdfEtag: text("pdf_etag"),
+    pdfVersion: text("pdf_version"),
     status: text("status", {
       enum: ["resolved", "generating", "ready", "failed"],
     }).notNull(),
     error: text("error"),
+    manifestCheckedAt: integer("manifest_checked_at", { mode: "timestamp_ms" }),
     createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
     updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
   },
   (table) => ({
     statusIdx: index("materials_status_idx").on(table.status),
     updatedIdx: index("materials_updated_idx").on(table.updatedAt),
+    readyCheckedIdx: index("materials_ready_checked_idx").on(table.status, table.manifestCheckedAt),
   }),
 );
 
@@ -46,6 +50,7 @@ export const jobs = sqliteTable(
     completedPages: integer("completed_pages").notNull().default(0),
     downloadUrl: text("download_url"),
     manifestToken: text("manifest_token"),
+    generatorVersion: text("generator_version").notNull().default("v1"),
     error: text("error"),
     createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
     updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),

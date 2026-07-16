@@ -26,13 +26,20 @@ switch (command) {
     if (!value) {
       throw new Error("Usage: pnpm ops:purge <contentId>");
     }
-    await printJson(`/api/ops/materials/${value}`, { method: "DELETE" });
+    await printJson(`/api/ops/materials/${value}?force=true`, { method: "DELETE" });
+    break;
+  case "regenerate":
+    if (!value) {
+      throw new Error("Usage: pnpm ops:regenerate <contentId>");
+    }
+    await printJson(`/api/ops/materials/${value}/regenerate`, { method: "POST" });
     break;
   default:
     console.log(`Usage:
   pnpm ops:stats
   pnpm ops:retry <jobId>
   pnpm ops:purge <contentId>
+  pnpm ops:regenerate <contentId>
 
 Environment:
   ZHICE_BASE_URL=https://your-worker.example.com

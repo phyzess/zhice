@@ -1,4 +1,5 @@
-import { LOCAL_HISTORY_KEY, PdfWriter, type JobStatus, type LocalHistoryItem } from "@zhice/core";
+import { LOCAL_HISTORY_KEY, type JobStatus, type LocalHistoryItem } from "@zhice/core";
+import { generateLocalPdf } from "./pdf/local-generator";
 
 type JobView = {
   jobId: string;
@@ -14,16 +15,10 @@ type JobView = {
   updatedAt: number;
 };
 
-type BrowserManifest = {
-  contentId: string;
-  title: string;
-  pageCount: number;
-  pageUrlTemplate: string;
-};
-
 type SaveHistoryOptions = {
   localPdfKey?: string;
   filename?: string;
+  storage?: "opfs" | "idb";
 };
 
 type StoredPdf = {
@@ -31,26 +26,11 @@ type StoredPdf = {
   filename: string;
 };
 
-class BrowserPdfSink {
-  readonly chunks: BlobPart[] = [];
-  size = 0;
-
-  write(chunk: Uint8Array): void {
-    const copy = new ArrayBuffer(chunk.byteLength);
-    new Uint8Array(copy).set(chunk);
-    this.chunks.push(copy);
-    this.size += chunk.byteLength;
-  }
-
-  toBlob(): Blob {
-    return new Blob(this.chunks, { type: "application/pdf" });
-  }
-}
-
 type CurrentLocalPdf = {
   jobId: string;
   localPdfKey: string;
   filename: string;
+  storage: "opfs" | "idb";
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -135,6 +115,20 @@ downloadButton.addEventListener("click", async () => {
   if (currentLocalPdf?.jobId !== currentJob.jobId) {
     return;
   }
+  // OPFS: download via getFile() which is disk-backed.
+  if (currentLocalPdf.storage === "opfs") {
+    try {
+      const root = await navigator.storage.getDirectory();
+      const handle = await root.getFileHandle(`zhice-pdfs/${currentLocalPdf.localPdfKey}`);
+      const file = await handle.getFile();
+      downloadBlob(file, currentLocalPdf.filename);
+      setTaskMessage("已开始下载，请在浏览器下载列表查看。");
+    } catch {
+      setTaskMessage("本地文件已失效，请重新生成。");
+    }
+    return;
+  }
+  // Legacy IDB.
   const stored = await readLocalPdf(currentLocalPdf.localPdfKey);
   if (!stored) {
     setTaskMessage("本地 PDF 已被清理，请重新生成。");
@@ -169,6 +163,13 @@ resetButton.addEventListener("click", () => {
 clearHistoryButton.addEventListener("click", async () => {
   localStorage.removeItem(LOCAL_HISTORY_KEY);
   await clearLocalPdfs();
+  // Also clear OPFS files.
+  try {
+    const root = await navigator.storage.getDirectory();
+    await root.removeEntry("zhice-pdfs", { recursive: true });
+  } catch {
+    // Directory may not exist.
+  }
   currentLocalPdf = null;
   if (currentJob) {
     renderJob(currentJob);
@@ -222,8 +223,20 @@ async function submitJob(url: string, mode: "auto" | "cloud" | "browser"): Promi
 function watchJob(jobId: string): void {
   stopWatching();
   if ("EventSource" in window) {
-    eventSource = new EventSource(`/api/jobs/${jobId}/events`);
-    eventSource.onmessage = (event) => {
+    const es = new EventSource(`/api/jobs/${jobId}/events`);
+    eventSource = es;
+    let sseOpened = false;
+    const sseTimeout = window.setTimeout(() => {
+      if (!sseOpened) {
+        stopWatching();
+        startPolling(jobId);
+      }
+    }, 3000);
+    es.onopen = () => {
+      sseOpened = true;
+      window.clearTimeout(sseTimeout);
+    };
+    es.onmessage = (event) => {
       const job = JSON.parse(event.data) as JobView;
       currentJob = job;
       renderJob(job);
@@ -232,15 +245,17 @@ function watchJob(jobId: string): void {
         stopWatching();
       }
     };
-    eventSource.onerror = () => {
+    es.onerror = () => {
       stopWatching();
-      pollJob(jobId);
+      startPolling(jobId);
     };
+  } else {
+    startPolling(jobId);
   }
-  pollTimer = window.setTimeout(() => pollJob(jobId), 2500);
 }
 
-function pollJob(jobId: string): void {
+function startPolling(jobId: string, intervalMs = 1500): void {
+  let pollCount = 0;
   const run = async () => {
     const response = await fetch(`/api/jobs/${jobId}`);
     if (!response.ok) {
@@ -254,7 +269,10 @@ function pollJob(jobId: string): void {
       stopWatching();
       return;
     }
-    pollTimer = window.setTimeout(run, 1500);
+    pollCount += 1;
+    // Slow down polling after 30 seconds.
+    const delay = pollCount > 20 ? 2500 : intervalMs;
+    pollTimer = window.setTimeout(run, delay);
   };
   void run();
 }
@@ -299,35 +317,49 @@ async function runBrowserFallback(job: JobView): Promise<void> {
   fallbackButton.disabled = true;
   downloadButton.classList.add("hidden");
   setTaskMessage("正在切换到本机生成...");
+
+  const controller = new AbortController();
+  // Allow user to reset/cancel.
+  resetButton.addEventListener("click", () => controller.abort(), { once: true });
+
   try {
     const manifestResponse = await fetch(job.manifestUrl);
     if (!manifestResponse.ok) {
       throw new Error("本机生成信息读取失败");
     }
-    const manifest = (await manifestResponse.json()) as BrowserManifest;
-    const sink = new BrowserPdfSink();
-    const writer = new PdfWriter(sink, { title: manifest.title });
-    await writer.start();
-    for (let page = 1; page <= manifest.pageCount; page += 1) {
-      setTaskMessage(`正在整理第 ${page} / ${manifest.pageCount} 页`);
-      taskProgress.style.width = `${Math.round((page / manifest.pageCount) * 100)}%`;
-      const imageResponse = await fetch(manifest.pageUrlTemplate.replace("{page}", String(page)));
-      if (!imageResponse.ok) {
-        throw new Error(await responseErrorMessage(imageResponse, `第 ${page} 页读取失败`));
-      }
-      await writer.addJpegPage({ bytes: new Uint8Array(await imageResponse.arrayBuffer()) });
-      if (page % 5 === 0) {
-        await nextFrame();
-      }
+    const manifest = (await manifestResponse.json()) as {
+      contentId: string;
+      title: string;
+      pageCount: number;
+      pageUrlTemplate: string;
+    };
+
+    const result = await generateLocalPdf({
+      title: manifest.title,
+      pageCount: manifest.pageCount,
+      pageUrlTemplate: manifest.pageUrlTemplate,
+      jobId: job.jobId,
+      signal: controller.signal,
+      onProgress: (page, total, _phase) => {
+        setTaskMessage(`正在整理第 ${page} / ${total} 页`);
+        taskProgress.style.width = `${Math.round((page / total) * 100)}%`;
+      },
+    });
+
+    downloadBlob(result.pdf, result.filename);
+
+    // Save to IndexedDB if using IDB backend (for OPFS, the file stays in OPFS).
+    if (result.storage === "idb" && result.pdf instanceof Blob) {
+      await saveLocalPdf(result.localPdfKey, result.pdf, result.filename);
     }
-    setTaskMessage("正在生成 PDF...");
-    await writer.finish();
-    const pdf = sink.toBlob();
-    const filename = `${safeFilename(manifest.title)}.pdf`;
-    const localPdfKey = `${job.jobId}.pdf`;
-    await saveLocalPdf(localPdfKey, pdf, filename);
-    downloadBlob(pdf, filename);
-    currentLocalPdf = { jobId: job.jobId, localPdfKey, filename };
+
+    currentLocalPdf = {
+      jobId: job.jobId,
+      localPdfKey: result.localPdfKey,
+      filename: result.filename,
+      storage: result.storage,
+    };
+
     const updated: JobView = {
       ...job,
       status: "succeeded",
@@ -336,11 +368,26 @@ async function runBrowserFallback(job: JobView): Promise<void> {
       updatedAt: Date.now(),
     };
     currentJob = updated;
-    saveHistory(updated, { localPdfKey, filename });
+    saveHistory(updated, {
+      localPdfKey: result.storage === "opfs" ? result.localPdfKey : undefined,
+      filename: result.filename,
+      storage: result.storage,
+    });
     renderJob(updated);
     setTaskMessage("已完成，已开始下载。");
   } catch (error) {
-    setTaskMessage(error instanceof Error ? error.message : "本机生成失败。");
+    if (error instanceof DOMException && error.name === "AbortError") {
+      setTaskMessage("本机生成已取消。");
+    } else {
+      setTaskMessage(error instanceof Error ? error.message : "本机生成失败。");
+    }
+    console.log(
+      JSON.stringify({
+        type: "pdf_browser_fallback",
+        jobId: job.jobId,
+        error: error instanceof Error ? error.message : String(error),
+      }),
+    );
   } finally {
     fallbackButton.disabled = false;
   }
@@ -362,6 +409,7 @@ function saveHistory(job: JobView, options: SaveHistoryOptions = {}): void {
     downloadUrl: job.downloadUrl ?? undefined,
     localPdfKey: options.localPdfKey ?? existing?.localPdfKey,
     filename: options.filename ?? existing?.filename,
+    storage: options.storage ?? existing?.storage,
     createdAt: existing?.createdAt ?? Date.now(),
     updatedAt: Date.now(),
   };
@@ -406,6 +454,22 @@ function renderHistory(): void {
         "inline-flex min-h-10 items-center border-4 border-black bg-[var(--color-primary)] px-3 text-sm font-black uppercase tracking-wide text-black shadow-[3px_3px_0_0_#000] transition duration-100 ease-linear active:translate-x-1 active:translate-y-1 active:shadow-none";
       download.textContent = "下载";
       download.addEventListener("click", async () => {
+        // OPFS storage: read from file system.
+        if (item.storage === "opfs") {
+          try {
+            const root = await navigator.storage.getDirectory();
+            const handle = await root.getFileHandle(`zhice-pdfs/${item.localPdfKey}`);
+            const file = await handle.getFile();
+            downloadBlob(file, item.filename ?? "教材.pdf");
+            if (!taskCard.classList.contains("hidden")) {
+              setTaskMessage("已开始下载，请在浏览器下载列表查看。");
+            }
+          } catch {
+            setTaskMessage("本地文件已失效，请重新生成。");
+          }
+          return;
+        }
+        // Legacy IDB storage.
         const stored = await readLocalPdf(item.localPdfKey ?? "");
         if (!stored) {
           setTaskMessage("本地文件已失效，请重新生成。");
@@ -425,7 +489,16 @@ function renderHistory(): void {
     remove.textContent = "删除";
     remove.addEventListener("click", async () => {
       if (item.localPdfKey) {
-        await deleteLocalPdf(item.localPdfKey);
+        if (item.storage === "opfs") {
+          try {
+            const root = await navigator.storage.getDirectory();
+            await root.removeEntry(`zhice-pdfs/${item.localPdfKey}`);
+          } catch {
+            // File may already be gone.
+          }
+        } else {
+          await deleteLocalPdf(item.localPdfKey);
+        }
       }
       localStorage.setItem(
         LOCAL_HISTORY_KEY,
@@ -631,26 +704,6 @@ function downloadBlob(blob: Blob, filename: string): void {
   setTimeout(() => URL.revokeObjectURL(url), 30_000);
 }
 
-async function responseErrorMessage(response: Response, fallback: string): Promise<string> {
-  try {
-    const value = (await response.clone().json()) as unknown;
-    if (isErrorPayload(value) && typeof value.error === "string" && value.error.length > 0) {
-      return value.error;
-    }
-  } catch {
-    // Keep the teacher-facing fallback below.
-  }
-  return fallback;
-}
-
-function safeFilename(value: string): string {
-  return value
-    .replace(/[\\/:*?"<>|]/g, "_")
-    .replace(/\s+/g, " ")
-    .trim()
-    .slice(0, 90);
-}
-
 function formatDate(value: number): string {
   return new Intl.DateTimeFormat("zh-CN", {
     month: "2-digit",
@@ -672,10 +725,6 @@ function escapeHtml(value: string): string {
         "'": "&#039;",
       })[char] ?? char,
   );
-}
-
-function nextFrame(): Promise<void> {
-  return new Promise((resolve) => requestAnimationFrame(() => resolve()));
 }
 
 function byId<T extends HTMLElement>(id: string): T {

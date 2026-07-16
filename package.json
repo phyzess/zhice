@@ -9,6 +9,9 @@
     "dev:vp": "pnpm --filter @zhice/web build && vp dev",
     "build": "pnpm --filter @zhice/web build && vp build",
     "deploy": "pnpm build && wrangler deploy",
+    "deploy:staging": "pnpm build && wrangler deploy --config wrangler.staging.jsonc",
+    "db:migrate:staging": "wrangler d1 migrations apply ZHICE_DB --remote --config wrangler.staging.jsonc",
+    "verify:staging": "tsx scripts/verify-production.ts",
     "check": "vp check && pnpm --filter @zhice/web check",
     "fix": "vp check --fix",
     "test": "vp test",
@@ -21,8 +24,10 @@
     "ops:stats": "tsx scripts/ops.ts stats",
     "ops:retry": "tsx scripts/ops.ts retry",
     "ops:purge": "tsx scripts/ops.ts purge",
+    "ops:regenerate": "tsx scripts/ops.ts regenerate",
     "verify:local": "tsx scripts/verify-local-sample.ts",
-    "verify:production": "tsx scripts/verify-production.ts"
+    "verify:production": "tsx scripts/verify-production.ts",
+    "benchmark": "tsx scripts/benchmark-pdf-pipeline.ts"
   },
   "dependencies": {
     "@hono/valibot-validator": "^0.6.1",
@@ -56,7 +61,7 @@
     "vitest": "^4.1.9",
     "wrangler": "^4.58.0"
   },
-  "packageManager": "pnpm@10.25.0",
+  "packageManager": "pnpm@11.5.2",
   "pnpm": {
     "onlyBuiltDependencies": [
       "esbuild",

@@ -28,6 +28,7 @@ export type DbJob = {
   completed_pages: number;
   download_url: string | null;
   manifest_token: string | null;
+  generator_version: string | null;
   error: string | null;
   created_at: number;
   updated_at: number;
@@ -42,6 +43,9 @@ export type DbMaterial = {
   image_signature: string;
   pdf_r2_key: string | null;
   pdf_size: number | null;
+  pdf_etag: string | null;
+  pdf_version: string | null;
+  manifest_checked_at: number | null;
   status: "resolved" | "generating" | "ready" | "failed";
   error: string | null;
   created_at: number;

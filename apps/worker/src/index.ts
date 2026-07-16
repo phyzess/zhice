@@ -14,7 +14,12 @@ app.route("/api/page", pageRoute);
 app.route("/api/ops", opsRoute);
 
 app.get("/api/health", (c) =>
-  c.json({ ok: true, service: "zhice", time: new Date().toISOString() }),
+  c.json({
+    ok: true,
+    service: "zhice",
+    environment: (c.env as Record<string, unknown>).ENVIRONMENT ?? "unknown",
+    time: new Date().toISOString(),
+  }),
 );
 
 app.notFound((c) => c.env.ASSETS.fetch(c.req.raw));

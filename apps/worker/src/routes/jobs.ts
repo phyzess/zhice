@@ -7,12 +7,15 @@ import {
   type MaterialManifest,
 } from "@zhice/core";
 import { Hono } from "hono";
+import { getPdfConfig } from "../config";
 import type { DbJob, Env } from "../env";
 import {
   createJob,
+  getFreshReadyMaterial,
   getJob,
   getMaterial,
   recordUsage,
+  revalidateMaterial,
   updateJob,
   upsertMaterial,
 } from "../services/db";
@@ -24,6 +27,7 @@ jobsRoute.post("/", vValidator("json", CreateJobSchema), async (c) => {
   const env = c.env;
   const input = c.req.valid("json");
   const remoteIp = c.req.header("CF-Connecting-IP") ?? null;
+  const config = getPdfConfig(env as unknown as Record<string, unknown>);
 
   if (!(await checkRateLimit(env, remoteIp, "create-job"))) {
     return c.json({ error: "提交太频繁，请稍后再试" }, 429);
@@ -36,6 +40,72 @@ jobsRoute.post("/", vValidator("json", CreateJobSchema), async (c) => {
     return c.json({ error: error instanceof Error ? error.message : "链接无效" }, 400);
   }
 
+  const mode = input.mode ?? "auto";
+  const token = crypto.randomUUID();
+
+  // ── Hot cache fast path: check D1 only (no upstream, no R2 head) ──
+  const cached = await getFreshReadyMaterial(env, contentId, config.manifestTtlMs);
+
+  if (cached?.status === "ready" && cached.pdf_r2_key) {
+    // Determine download URL: v2 artifacts go to CDN, v1/legacy go through Worker.
+    const downloadUrl = cached.pdf_version
+      ? cdnDownloadUrl(config.publicBaseUrl, cached.pdf_r2_key)
+      : legacyDownloadUrl(contentId);
+
+    const job = await createJob(env, {
+      id: crypto.randomUUID(),
+      contentId,
+      mode,
+      status: "succeeded",
+      title: cached.title,
+      pageCount: cached.page_count,
+      manifestToken: token,
+      downloadUrl,
+      generatorVersion: config.generatorVersion,
+    });
+
+    await recordUsage(env, "cache_hit", contentId);
+    console.log(
+      JSON.stringify({
+        type: "pdf_cache_hit",
+        contentId,
+        jobId: job.id,
+      }),
+    );
+
+    // ── Background revalidation (fire-and-forget) ──
+    const checkedAt = cached.manifest_checked_at ?? 0;
+    if (Date.now() - checkedAt > config.manifestTtlMs) {
+      c.executionCtx.waitUntil(
+        (async () => {
+          try {
+            const manifest = await fetchSmartEduManifest(contentId);
+            await revalidateMaterial(env, contentId, manifest);
+            console.log(
+              JSON.stringify({
+                type: "pdf_manifest_revalidated",
+                contentId,
+                signatureChanged: manifest.imageSignature !== cached.image_signature,
+              }),
+            );
+          } catch (error) {
+            // Background revalidation failure — keep serving the old PDF.
+            console.log(
+              JSON.stringify({
+                type: "pdf_manifest_revalidation_failed",
+                contentId,
+                error: error instanceof Error ? error.message : String(error),
+              }),
+            );
+          }
+        })(),
+      );
+    }
+
+    return c.json(serializeJob(job, cached));
+  }
+
+  // ── Cold path: fetch manifest, claim single-flight, start workflow ──
   let manifest: MaterialManifest;
   try {
     manifest = await fetchSmartEduManifest(contentId);
@@ -44,30 +114,6 @@ jobsRoute.post("/", vValidator("json", CreateJobSchema), async (c) => {
   }
 
   await upsertMaterial(env, manifest, "resolved");
-
-  const cached = await getMaterial(env, contentId);
-  const token = crypto.randomUUID();
-  const mode = input.mode ?? "auto";
-  const cachedObject =
-    cached?.status === "ready" && cached.pdf_r2_key
-      ? await env.ZHICE_BUCKET.head(cached.pdf_r2_key)
-      : null;
-  if (cached?.pdf_r2_key && cachedObject) {
-    const jobId = crypto.randomUUID();
-    await createJob(env, {
-      id: jobId,
-      contentId,
-      mode,
-      status: "succeeded",
-      title: manifest.title,
-      pageCount: manifest.pageCount,
-      manifestToken: token,
-      downloadUrl: downloadUrl(contentId),
-    });
-    await recordUsage(env, "cache_hit", contentId);
-    const job = await getJob(env, jobId);
-    return c.json(serializeJob(job!, manifest));
-  }
 
   const claim = await claimSingleFlight(env, contentId, crypto.randomUUID());
   if (claim.existingJobId) {
@@ -79,7 +125,7 @@ jobsRoute.post("/", vValidator("json", CreateJobSchema), async (c) => {
 
   const jobId = claim.jobId;
   const initialStatus = mode === "browser" ? "fallback_ready" : "queued";
-  await createJob(env, {
+  const job = await createJob(env, {
     id: jobId,
     contentId,
     mode,
@@ -87,12 +133,12 @@ jobsRoute.post("/", vValidator("json", CreateJobSchema), async (c) => {
     title: manifest.title,
     pageCount: manifest.pageCount,
     manifestToken: token,
+    generatorVersion: config.generatorVersion,
   });
   await recordUsage(env, "job_created", contentId, { mode });
 
   if (mode === "browser") {
-    const job = await getJob(env, jobId);
-    return c.json(serializeJob(job!, manifest));
+    return c.json(serializeJob(job, manifest));
   }
 
   try {
@@ -107,8 +153,8 @@ jobsRoute.post("/", vValidator("json", CreateJobSchema), async (c) => {
     });
   }
 
-  const job = await getJob(env, jobId);
-  return c.json(serializeJob(job!, manifest));
+  const updated = await getJob(env, jobId);
+  return c.json(serializeJob(updated!, manifest));
 });
 
 jobsRoute.get("/:jobId", async (c) => {
@@ -121,32 +167,85 @@ jobsRoute.get("/:jobId", async (c) => {
 });
 
 jobsRoute.get("/:jobId/events", async (c) => {
+  const env = c.env;
   const jobId = c.req.param("jobId");
+  const signal = c.req.raw.signal;
+
   const stream = new ReadableStream({
     async start(controller) {
       const encoder = new TextEncoder();
       let count = 0;
+      const maxPolls = 600; // 10 minutes at 1s interval
+
       const push = async () => {
-        const job = await getJob(c.env, jobId);
-        if (!job) {
-          controller.enqueue(encoder.encode("event: error\ndata: {}\n\n"));
-          controller.close();
+        // Stop if client disconnected or aborted.
+        if (signal.aborted) {
+          try {
+            controller.close();
+          } catch {
+            // Already closed.
+          }
           return;
         }
-        controller.enqueue(encoder.encode(`data: ${JSON.stringify(serializeJob(job))}\n\n`));
-        count += 1;
-        if (
-          ["succeeded", "failed", "fallback_ready", "canceled"].includes(job.status) ||
-          count >= 180
-        ) {
-          controller.close();
+
+        try {
+          const job = await getJob(env, jobId);
+          if (!job) {
+            controller.enqueue(encoder.encode("event: error\ndata: {}\n\n"));
+            controller.close();
+            return;
+          }
+
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify(serializeJob(job))}\n\n`));
+          count += 1;
+
+          if (["succeeded", "failed", "fallback_ready", "canceled"].includes(job.status)) {
+            controller.close();
+            return;
+          }
+
+          if (count >= maxPolls) {
+            controller.close();
+            return;
+          }
+
+          // Send heartbeat every 15s to keep connection alive.
+          if (count % 15 === 0) {
+            controller.enqueue(encoder.encode(": heartbeat\n\n"));
+          }
+        } catch (_error) {
+          // Enqueue failure — client likely disconnected.
+          try {
+            controller.close();
+          } catch {
+            // Already closed.
+          }
           return;
         }
-        setTimeout(push, 1000);
       };
+
+      // Initial push.
       await push();
+
+      // Poll interval.
+      const interval = setInterval(async () => {
+        await push();
+        if (signal.aborted) {
+          clearInterval(interval);
+        }
+      }, 1000);
+
+      // Clean up on abort.
+      signal.addEventListener(
+        "abort",
+        () => {
+          clearInterval(interval);
+        },
+        { once: true },
+      );
     },
   });
+
   return new Response(stream, {
     headers: {
       "content-type": "text/event-stream",
@@ -155,18 +254,19 @@ jobsRoute.get("/:jobId/events", async (c) => {
   });
 });
 
-export function serializeJob(job: DbJob, manifest?: MaterialManifest | null) {
+export function serializeJob(job: DbJob, manifest?: MaterialManifest | DbMaterial | null) {
+  const material = manifest as DbMaterial | null;
   return {
     jobId: job.id,
     contentId: job.content_id,
     status: job.status,
     mode: job.mode,
-    title: job.title ?? manifest?.title ?? "智慧教育平台教材",
-    pageCount: job.page_count ?? manifest?.pageCount ?? 0,
+    title: job.title ?? material?.title ?? "智慧教育平台教材",
+    pageCount: job.page_count ?? material?.page_count ?? 0,
     completedPages: job.completed_pages,
     error: job.error,
     downloadUrl:
-      job.status === "succeeded" ? (job.download_url ?? downloadUrl(job.content_id)) : null,
+      job.status === "succeeded" ? (job.download_url ?? legacyDownloadUrl(job.content_id)) : null,
     manifestUrl:
       job.status === "fallback_ready" || job.status === "failed"
         ? `/api/materials/${job.content_id}/manifest?jobId=${job.id}&token=${job.manifest_token}`
@@ -190,8 +290,15 @@ function materialToManifest(
   };
 }
 
-function downloadUrl(contentId: string): string {
+function legacyDownloadUrl(contentId: string): string {
   return `/api/materials/${contentId}/download`;
+}
+
+function cdnDownloadUrl(publicBaseUrl: string, r2Key: string): string {
+  if (!publicBaseUrl) {
+    return "";
+  }
+  return `${publicBaseUrl.replace(/\/+$/, "")}/${r2Key}`;
 }
 
 async function claimSingleFlight(
@@ -213,5 +320,6 @@ async function claimSingleFlight(
   if (!response.ok) {
     return { jobId };
   }
-  return (await response.json()) as { jobId: string; existingJobId?: string };
+  const body = (await response.json()) as { jobId: string; existingJobId?: string };
+  return body;
 }

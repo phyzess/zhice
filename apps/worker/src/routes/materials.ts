@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { getPdfConfig } from "../config";
 import type { Env } from "../env";
 import { getJob, getMaterial, recordUsage } from "../services/db";
 import { proxyPageImage } from "../services/images";
@@ -6,26 +7,118 @@ import { proxyPageImage } from "../services/images";
 export const materialsRoute = new Hono<{ Bindings: Env }>();
 
 materialsRoute.get("/:contentId/download", async (c) => {
+  const env = c.env;
   const contentId = c.req.param("contentId");
-  const material = await getMaterial(c.env, contentId);
-  if (!material?.pdf_r2_key) {
+  const config = getPdfConfig(env as unknown as Record<string, unknown>);
+
+  const material = await getMaterial(env, contentId);
+  if (!material) {
     return c.json({ error: "PDF 还没有生成" }, 404);
   }
-  const object = await c.env.ZHICE_BUCKET.get(material.pdf_r2_key);
-  if (!object?.body) {
-    return c.json({ error: "缓存文件不存在" }, 404);
+
+  // ── v2 artifact: 302 redirect to R2 CDN ──
+  if (material.pdf_version && material.pdf_r2_key && config.publicBaseUrl) {
+    const cdnUrl = `${config.publicBaseUrl.replace(/\/+$/, "")}/${material.pdf_r2_key}`;
+
+    // Record download asynchronously.
+    c.executionCtx.waitUntil(recordUsage(env, "download", contentId));
+
+    console.log(
+      JSON.stringify({
+        type: "pdf_download_redirected",
+        contentId,
+        pdfVersion: material.pdf_version,
+      }),
+    );
+
+    return new Response(null, {
+      status: 302,
+      headers: {
+        location: cdnUrl,
+        "cache-control": "no-store",
+      },
+    });
   }
-  await recordUsage(c.env, "download", contentId);
+
+  // ── v1 legacy or CDN fallback: serve directly from R2 Worker binding ──
+  if (!material.pdf_r2_key) {
+    return c.json({ error: "PDF 还没有生成" }, 404);
+  }
+
+  // Record download asynchronously.
+  c.executionCtx.waitUntil(recordUsage(env, "download", contentId));
+
+  // Forward request headers for Range/conditional requests.
+  const requestHeaders = new Headers();
+  const range = c.req.header("Range");
+  const ifNoneMatch = c.req.header("If-None-Match");
+  const ifModifiedSince = c.req.header("If-Modified-Since");
+
+  if (range) {
+    requestHeaders.set("Range", range);
+  }
+  if (ifNoneMatch) {
+    requestHeaders.set("If-None-Match", ifNoneMatch);
+  }
+  if (ifModifiedSince) {
+    requestHeaders.set("If-Modified-Since", ifModifiedSince);
+  }
+
+  const object = await env.ZHICE_BUCKET.get(material.pdf_r2_key, {
+    range: requestHeaders,
+    onlyIf: requestHeaders,
+  });
+
+  if (!object) {
+    // Check if the key exists at all.
+    const head = await env.ZHICE_BUCKET.head(material.pdf_r2_key);
+    if (!head) {
+      return c.json({ error: "缓存文件不存在" }, 404);
+    }
+    // Key exists but range/conditional didn't match.
+    return new Response(null, { status: 416 });
+  }
+
+  const responseHeaders = new Headers();
+  responseHeaders.set("content-type", object.httpMetadata?.contentType ?? "application/pdf");
+  responseHeaders.set("accept-ranges", "bytes");
+
+  if (object.range) {
+    responseHeaders.set(
+      "content-range",
+      `bytes ${object.range.offset}-${object.range.offset + (object.size - 1)}/${headSize(object)}`,
+    );
+  }
+
+  if (object.size) {
+    responseHeaders.set("content-length", String(object.size));
+  }
+
+  if (object.httpEtag) {
+    responseHeaders.set("etag", object.httpEtag);
+  }
+
   const filename = encodeURIComponent(`${safeFilename(material.title)}.pdf`);
+  responseHeaders.set("content-disposition", `attachment; filename*=UTF-8''${filename}`);
+  responseHeaders.set("cache-control", "private, max-age=0");
+
+  const status = object.range ? 206 : ifNoneMatch && object.httpEtag === ifNoneMatch ? 304 : 200;
+
+  if (status === 304) {
+    return new Response(null, { status: 304, headers: responseHeaders });
+  }
+
   return new Response(object.body, {
-    headers: {
-      "content-type": "application/pdf",
-      "content-length": String(object.size),
-      "content-disposition": `attachment; filename*=UTF-8''${filename}`,
-      "cache-control": "private, max-age=0",
-    },
+    status,
+    headers: responseHeaders,
   });
 });
+
+function headSize(object: R2ObjectBody | R2Object): number {
+  // R2ObjectBody might not have size directly when using range; use the stored size.
+  // The object from get() with range should have .size on the response.
+  return object.size;
+}
 
 materialsRoute.get("/:contentId/manifest", async (c) => {
   const auth = await validateJobToken(

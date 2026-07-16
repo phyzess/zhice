@@ -9,6 +9,8 @@ export type LocalHistoryItem = {
   downloadUrl?: string;
   localPdfKey?: string;
   filename?: string;
+  /** Storage backend: "opfs" for new files, "idb" for legacy IndexedDB. */
+  storage?: "opfs" | "idb";
   createdAt: number;
   updatedAt: number;
 };

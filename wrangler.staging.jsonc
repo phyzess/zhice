@@ -1,6 +1,6 @@
 {
   "$schema": "./node_modules/wrangler/config-schema.json",
-  "name": "zhice",
+  "name": "zhice-staging",
   "main": "apps/worker/src/index.ts",
   "compatibility_date": "2026-06-30",
   "compatibility_flags": ["nodejs_compat"],
@@ -12,7 +12,7 @@
     "head_sampling_rate": 1,
     "traces": {
       "enabled": true,
-      "head_sampling_rate": 0.1,
+      "head_sampling_rate": 1,
     },
   },
   "assets": {
@@ -22,7 +22,7 @@
     "run_worker_first": ["/api/*"],
   },
   "vars": {
-    "ENVIRONMENT": "production",
+    "ENVIRONMENT": "staging",
     "PDF_PUBLIC_BASE_URL": "",
     "PDF_FETCH_CONCURRENCY": 6,
     "PDF_UPLOAD_CONCURRENCY": 2,
@@ -33,15 +33,15 @@
   "d1_databases": [
     {
       "binding": "ZHICE_DB",
-      "database_name": "zhice",
-      "database_id": "4d3b0f33-59af-450d-809e-9a24cae842ab",
+      "database_name": "zhice-staging",
+      "database_id": "",
       "migrations_dir": "packages/db/migrations",
     },
   ],
   "r2_buckets": [
     {
       "binding": "ZHICE_BUCKET",
-      "bucket_name": "zhice",
+      "bucket_name": "zhice-staging",
     },
   ],
   "durable_objects": {
@@ -60,7 +60,7 @@
   ],
   "workflows": [
     {
-      "name": "zhice-pdf-workflow",
+      "name": "zhice-pdf-workflow-staging",
       "binding": "PDF_WORKFLOW",
       "class_name": "PdfWorkflow",
     },
