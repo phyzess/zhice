@@ -23,7 +23,7 @@
   },
   "vars": {
     "ENVIRONMENT": "production",
-    "PDF_PUBLIC_BASE_URL": "",
+    "PDF_PUBLIC_BASE_URL": "https://zhice-cdn.phyzess.me",
     "PDF_FETCH_CONCURRENCY": 6,
     "PDF_UPLOAD_CONCURRENCY": 2,
     "PDF_PART_SIZE_BYTES": 8388608,
