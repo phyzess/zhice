@@ -15,11 +15,23 @@
 ## 功能
 
 - 单页工作台：中心输入框、当前任务卡、本地最近下载。
-- 默认云端生成 PDF，并把结果静默缓存到 R2。
-- 云端失败或排队过久时，可改用浏览器本机生成。
+- 默认云端生成 PDF（6 路并发抓页 + 并行 R2 上传），结果缓存到 R2 并通过 CDN 分发。
+- 热缓存命中 P50 < 1 秒直接返回下载入口。
+- 支持断点续传下载（HEAD / Range / 206 / ETag / 304）。
+- 云端失败或排队过久时，可改用浏览器本机生成（OPFS 流式写入，低内存占用）。
 - 微信或手机浏览器会提示用户换系统浏览器，避免大文件下载失败。
 - 公开可用，创建生成任务使用匿名限流保护。
 - 不做登录、不做服务端用户历史、不做 `/admin` 页面。
+
+## 性能
+
+| 指标 | 值 |
+|---|---|
+| 205 页冷生成 | 约 90 秒 |
+| 热缓存 P50 | 250ms |
+| 下载吞吐 | 4.9 MB/s |
+| CDN 延迟 | 80ms |
+| 峰值内存 | ~40 MiB（低于 Workers 128 MiB） |
 
 ## 技术栈
 
@@ -31,6 +43,20 @@
 - `unplugin-icons` + Lucide Iconify 包
 - Oxlint + Oxfmt
 - D1、R2、Workflows、Durable Objects
+
+## 架构
+
+```
+浏览器
+  -> Workers Static Assets 读取页面
+  -> /api/* 进入 Hono
+  -> D1 保存任务和材料索引
+  -> Workflows 云端生成 PDF（6 路并发）
+  -> R2 保存最终 PDF（2 路并行 multipart）
+  -> R2 自定义域名 CDN（302 redirect）
+```
+
+PDF 采用内容寻址 Key：`SHA-256(imageSignature + "|" + generatorVersion)`，不可变、可缓存。
 
 ## 本地开发
 
@@ -57,12 +83,32 @@ pdfinfo /tmp/zhice-local-sample.pdf
 pnpm dev:web
 ```
 
-## 部署前准备
+## 测试
+
+```bash
+pnpm test          # 单元测试
+pnpm test:worker   # Worker 集成测试
+pnpm test:browser  # 浏览器测试
+pnpm test:e2e      # E2E 测试
+```
+
+## 性能基准
+
+```bash
+# 前 24 页对比 1 并发 vs 6 并发
+pnpm benchmark
+
+# 全 205 页
+ZHICE_BENCH_FULL=1 pnpm benchmark
+```
+
+## 部署
 
 1. 创建 D1 database，并把 `wrangler.jsonc` 中的 `database_id` 换成真实值。
 2. 创建 R2 bucket，默认名为 `zhice`。
 3. 设置 `OPS_TOKEN` 和 `RATE_LIMIT_PEPPER`。
 4. 应用 D1 migration。
+5. 配置 R2 自定义域名（可选），设为 `PDF_PUBLIC_BASE_URL`。
 
 ```bash
 wrangler secret put OPS_TOKEN
@@ -74,10 +120,17 @@ pnpm deploy
 部署后验证真实云端链路：
 
 ```bash
-OPS_TOKEN=... ZHICE_BASE_URL=https://your-domain.example ZHICE_VERIFY_PURGE=1 pnpm verify:production
+OPS_TOKEN=... ZHICE_BASE_URL=https://your-domain.example pnpm verify:production
 ```
 
-这个命令会通过受保护的 Ops API 触发一条教材生成任务，等待 Workflows 完成，下载 R2 PDF，核对 PDF 页数，并再次提交确认缓存命中。
+## 运维
+
+```bash
+OPS_TOKEN=... ZHICE_BASE_URL=https://your-domain.example pnpm ops:stats
+OPS_TOKEN=... ZHICE_BASE_URL=https://your-domain.example pnpm ops:retry <jobId>
+OPS_TOKEN=... ZHICE_BASE_URL=https://your-domain.example pnpm ops:purge <contentId>
+OPS_TOKEN=... ZHICE_BASE_URL=https://your-domain.example pnpm ops:regenerate <contentId>
+```
 
 ## 合规边界
 
